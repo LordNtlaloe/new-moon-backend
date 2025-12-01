@@ -11,7 +11,7 @@ const app = express();
 
 // Enhanced CORS configuration
 const corsOptions = {
-    origin: true, // Allow all origins for now
+    origin: "*",
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -24,8 +24,7 @@ app.use(cors(corsOptions));
 app.use((req, res, next) => {
     const start = Date.now();
 
-    // Log request
-    logger.info(`${req.method} ${req.path}`, {
+    console.log(`${req.method} ${req.path}`, {
         body: req.body,
         query: req.query,
         origin: req.get('origin'),
@@ -38,7 +37,7 @@ app.use((req, res, next) => {
 
     res.json = function (data: any) {
         const duration = Date.now() - start;
-        logger.info(`RESPONSE ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`, {
+        console.log(`RESPONSE ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`, {
             statusCode: res.statusCode,
             data: data
         });
@@ -47,7 +46,7 @@ app.use((req, res, next) => {
 
     res.send = function (body: any) {
         const duration = Date.now() - start;
-        logger.info(`RESPONSE ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`, {
+        console.log(`RESPONSE ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`, {
             statusCode: res.statusCode,
             body: body
         });
@@ -58,6 +57,8 @@ app.use((req, res, next) => {
 });
 
 app.use(bodyParser.json());
+
+// ========== TEST ENDPOINTS (MUST COME BEFORE MAIN ROUTES) ==========
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
@@ -70,6 +71,7 @@ app.get('/health', (_req, res) => {
 
 // Database test endpoint
 app.get('/api/test-db', async (_req, res) => {
+    console.log('🔧 /api/test-db endpoint called');
     try {
         await prisma.$connect();
         const userCount = await prisma.user.count();
@@ -92,6 +94,7 @@ app.get('/api/test-db', async (_req, res) => {
 
 // Simple test endpoint
 app.get('/api/test-json', (_req, res) => {
+    console.log('🔧 /api/test-json endpoint called');
     return res.json({
         success: true,
         message: 'JSON test endpoint works',
@@ -99,9 +102,22 @@ app.get('/api/test-json', (_req, res) => {
     });
 });
 
+// Test login endpoint (to debug the empty response issue)
+app.post('/api/test-login', async (req, res) => {
+    console.log('🔧 /api/test-login endpoint called with body:', req.body);
+    return res.json({
+        success: true,
+        message: 'Test login endpoint works',
+        timestamp: new Date().toISOString(),
+        receivedBody: req.body
+    });
+});
+
+// ========== MAIN ROUTES ==========
 app.use("/api", routes);
 
-// Error handling middleware - FIXED VERSION
+// ========== ERROR HANDLING ==========
+// Error handling middleware
 app.use(
     (err: ErrorHandler, req: Request, res: Response, next: NextFunction) => {
         console.error('Global error handler caught:', err);
@@ -109,7 +125,7 @@ app.use(
     }
 );
 
-// 404 handler
+// 404 handler (MUST BE LAST)
 app.use((req: Request, res: Response) => {
     console.warn(`404 - Route not found: ${req.method} ${req.path}`);
     res.status(404).json({
@@ -122,9 +138,9 @@ app.use((req: Request, res: Response) => {
 const checkDatabaseConnection = async () => {
     try {
         await prisma.$connect();
-        logger.debug("✅ Database connection established successfully");
+        console.log("✅ Database connection established successfully");
     } catch (error) {
-        logger.error("❌ Unable to connect to the database!", error);
+        console.error("❌ Unable to connect to the database!", error);
     }
 };
 
