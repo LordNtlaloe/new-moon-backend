@@ -1,3 +1,4 @@
+// app.ts
 import express, { NextFunction, Request, Response } from "express";
 import { logger } from "./logger";
 import bodyParser from "body-parser";
@@ -8,30 +9,51 @@ import routes from "./api/routes";
 
 const app = express();
 
-// Enhanced CORS configuration for React Native development
-const isDevelopment = process.env.NODE_ENV !== 'production';
-
+// Enhanced CORS configuration
 const corsOptions = {
-    origin: isDevelopment
-        ? true // Allow all origins in development
-        : [
-            'https://your-production-domain.com',
-            // Add your production domains here
-        ],
+    origin: true, // Allow all origins for now
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
-    optionsSuccessStatus: 200 // For legacy browsers
+    optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
 
-// Add request logging middleware for debugging
-app.use((req, _res, next) => {
-    logger.debug(`${req.method} ${req.path}`, {
+// Add request/response logging middleware
+app.use((req, res, next) => {
+    const start = Date.now();
+
+    // Log request
+    logger.info(`${req.method} ${req.path}`, {
+        body: req.body,
+        query: req.query,
         origin: req.get('origin'),
         userAgent: req.get('user-agent')
     });
+
+    // Override response methods to log
+    const oldSend = res.send;
+    const oldJson = res.json;
+
+    res.json = function (data: any) {
+        const duration = Date.now() - start;
+        logger.info(`RESPONSE ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`, {
+            statusCode: res.statusCode,
+            data: data
+        });
+        return oldJson.call(this, data);
+    };
+
+    res.send = function (body: any) {
+        const duration = Date.now() - start;
+        logger.info(`RESPONSE ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`, {
+            statusCode: res.statusCode,
+            body: body
+        });
+        return oldSend.call(this, body);
+    };
+
     next();
 });
 
@@ -46,14 +68,57 @@ app.get('/health', (_req, res) => {
     });
 });
 
+// Database test endpoint
+app.get('/api/test-db', async (_req, res) => {
+    try {
+        await prisma.$connect();
+        const userCount = await prisma.user.count();
+
+        return res.json({
+            success: true,
+            message: 'Database connected successfully',
+            userCount,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error: any) {
+        console.error('Database connection error:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Database connection failed',
+            message: error.message
+        });
+    }
+});
+
+// Simple test endpoint
+app.get('/api/test-json', (_req, res) => {
+    return res.json({
+        success: true,
+        message: 'JSON test endpoint works',
+        timestamp: new Date().toISOString()
+    });
+});
+
 app.use("/api", routes);
 
+// Error handling middleware - FIXED VERSION
 app.use(
-    (err: ErrorHandler, _req: Request, res: Response, _next: NextFunction) => {
+    (err: ErrorHandler, req: Request, res: Response, next: NextFunction) => {
+        console.error('Global error handler caught:', err);
         handleError(err, res);
     }
 );
 
+// 404 handler
+app.use((req: Request, res: Response) => {
+    console.warn(`404 - Route not found: ${req.method} ${req.path}`);
+    res.status(404).json({
+        success: false,
+        error: 'Route not found'
+    });
+});
+
+// Check database connection on startup
 const checkDatabaseConnection = async () => {
     try {
         await prisma.$connect();
