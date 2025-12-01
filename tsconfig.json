@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es6",
+    "outDir": "dist",
+    "rootDir": ".",
+    "strict": true,
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/controllers/*": ["controllers/*"],
+      "@/api/middleware/*": ["middleware/*"],
+      "@/lib/*": ["database/*"],
+      "@/prisma/*": ["prisma/*"],
+      "@/utils/*": ["utils/*"],
+      "@/repo/*": ["repository/*"],
+      "@/domain/*": ["domain/*"]
+    },
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "typeRoots": ["./node_modules/@types", "./types"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", ".build", "dist"]
+}

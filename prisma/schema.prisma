@@ -1,0 +1,324 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CLIENT
+  TRAINER
+  ADMIN
+}
+
+enum MembershipTier {
+  FREE
+  BASIC
+  PREMIUM
+  VIP
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  MOBILE_MONEY
+  BANK_TRANSFER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  firstName String
+  lastName  String
+  role      UserRole
+  phone     String?
+  avatar    String?
+  password  String
+
+  // Authentication fields
+  refreshToken      String?
+  emailVerified     Boolean   @default(false)
+  verificationToken String?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+
+  // Membership fields
+  membershipTier   MembershipTier   @default(FREE)
+  membershipStatus MembershipStatus @default(ACTIVE)
+  membershipStart  DateTime?
+  membershipEnd    DateTime?
+
+  // Relations
+  memberships   Membership[]
+  payments      Payment[]
+  subscriptions Subscription[]
+  contentAccess ContentAccess[]
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  userProgresses UserProgress[]
+
+  @@map("users")
+}
+
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tier      MembershipTier
+  status    MembershipStatus @default(PENDING)
+  startDate DateTime
+  endDate   DateTime
+  autoRenew Boolean          @default(true)
+
+  // Pricing
+  amount   Float
+  currency String @default("LSL")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("memberships")
+}
+
+model Subscription {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tier   MembershipTier
+  status MembershipStatus @default(ACTIVE)
+
+  // Billing cycle
+  billingCycle String
+  amount       Float
+  currency     String @default("LSL")
+
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean   @default(false)
+  canceledAt         DateTime?
+
+  // Payment gateway reference
+  stripeSubscriptionId String?        @unique
+  paymentMethod        PaymentMethod?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount        Float
+  currency      String        @default("LSL")
+  status        PaymentStatus @default(PENDING)
+  paymentMethod PaymentMethod
+
+  // Payment gateway details
+  transactionId   String? @unique
+  stripePaymentId String? @unique
+
+  // Payment metadata
+  description String?
+  metadata    Json?
+
+  // Receipt
+  receiptUrl    String?
+  invoiceNumber String? @unique
+
+  failureReason String?
+  refundedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("payments")
+}
+
+model ContentAccess {
+  id String @id @default(cuid())
+
+  // Content details
+  contentType String
+  contentId   String
+  title       String
+
+  // Access control
+  requiredTier MembershipTier
+  isPremium    Boolean        @default(false)
+
+  // Relations
+  users User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contentType, contentId])
+  @@index([requiredTier])
+  @@map("content_access")
+}
+
+model MembershipPlan {
+  id String @id @default(cuid())
+
+  name        String
+  tier        MembershipTier @unique
+  description String?
+
+  // Pricing
+  monthlyPrice   Float
+  quarterlyPrice Float?
+  yearlyPrice    Float?
+  currency       String @default("LSL")
+
+  // Features
+  features Json
+
+  // Limits
+  maxWorkouts         Int?
+  maxVideos           Int?
+  hasPersonalTraining Boolean @default(false)
+  hasNutritionPlan    Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("membership_plans")
+}
+
+// Add to your existing prisma/schema.prisma
+
+enum ExerciseDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum WorkoutType {
+  HIIT
+  AEROBIC
+  FLEXIBILITY
+  STRENGTH
+  CARDIO
+  YOGA
+}
+
+model Exercise {
+  id           String             @id @default(cuid())
+  name         String
+  description  String?
+  difficulty   ExerciseDifficulty
+  duration     Int // in minutes
+  calories     Int // estimated calories burned
+  image        String?
+  videoUrl     String?
+  instructions Json? // array of step-by-step instructions
+
+  // Access control
+  requiredTier MembershipTier @default(FREE)
+
+  // Relations
+  workoutExercises WorkoutExercise[]
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  userProgresses UserProgress[]
+
+  @@map("exercises")
+}
+
+model Workout {
+  id            String      @id @default(cuid())
+  title         String
+  description   String?
+  type          WorkoutType
+  duration      Int // total duration in minutes
+  totalCalories Int // total estimated calories
+  image         String?
+
+  // Access control
+  requiredTier MembershipTier @default(FREE)
+  isPremium    Boolean        @default(false)
+
+  // Relations
+  workoutExercises WorkoutExercise[]
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  userProgresses UserProgress[]
+
+  @@map("workouts")
+}
+
+model WorkoutExercise {
+  id         String @id @default(cuid())
+  workoutId  String
+  exerciseId String
+  order      Int // order in the workout
+  sets       Int?
+  reps       Int?
+  duration   Int? // duration for this specific exercise
+
+  workout  Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workoutId, exerciseId])
+  @@map("workout_exercises")
+}
+
+model UserProgress {
+  id         String  @id @default(cuid())
+  userId     String
+  workoutId  String
+  exerciseId String?
+
+  completed      Boolean @default(false)
+  progress       Float? // percentage 0-100
+  duration       Int? // actual time taken
+  caloriesBurned Int? // actual calories burned
+
+  // Timestamps
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout  Workout   @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise? @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, workoutId, exerciseId])
+  @@map("user_progress")
+}
