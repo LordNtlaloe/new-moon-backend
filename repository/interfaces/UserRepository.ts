@@ -8,7 +8,7 @@ interface CreateUserData {
   phone?: string;
   avatar?: string;
   password: string;
-  refreshToken?: string | null;
+  refreshToken?: string | null;  // Add this
 }
 
 export default interface UserRepository {
