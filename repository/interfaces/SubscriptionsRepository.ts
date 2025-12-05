@@ -1,20 +1,20 @@
-import { Subscription, MembershipStatus, MembershipTier, PaymentMethod } from "@prisma/client";
+// repository/interfaces/SubscriptionRepository.ts
+import { Subscription, MembershipTier, MembershipStatus, PaymentMethod } from "@prisma/client";
 
 export interface CreateSubscriptionData {
     userId: string;
     tier: MembershipTier;
-    status?: MembershipStatus;
     billingCycle: string;
     amount: number;
     currency?: string;
     currentPeriodStart: Date;
     currentPeriodEnd: Date;
-    cancelAtPeriodEnd?: boolean;
     paymentMethod?: PaymentMethod;
     stripeSubscriptionId?: string;
 }
 
 export interface UpdateSubscriptionData {
+    tier?: MembershipTier;
     status?: MembershipStatus;
     billingCycle?: string;
     amount?: number;
@@ -33,6 +33,6 @@ export default interface SubscriptionRepository {
     getSubscriptionsByUserId(userId: string): Promise<Subscription[]>;
     updateSubscription(id: string, data: UpdateSubscriptionData): Promise<Subscription>;
     deleteSubscription(id: string): Promise<Subscription>;
-    getSubscriptionByStripeId(stripeSubscriptionId: string): Promise<Subscription | null>;
     getActiveSubscriptionByUserId(userId: string): Promise<Subscription | null>;
+    cancelSubscription(id: string): Promise<Subscription>;
 }

@@ -1,7 +1,8 @@
+// routes/subscription-routes.ts
 import { Router } from "express";
-import { authMiddleware, requireRole } from "../../middleware/auth-middleware";
 import { SubscriptionController } from "../controllers/subscriptions-controller";
-import subscriptionRepository from "../../repository/subscriptions-repository"
+import subscriptionRepository from "../../repository/subscriptions-repository";
+import { authMiddleware, requireRole } from "../../middleware/auth-middleware";
 
 const router = Router();
 const subscriptionController = new SubscriptionController(subscriptionRepository);
@@ -16,7 +17,7 @@ router.post("/", subscriptionController.createSubscription.bind(subscriptionCont
 router.patch("/:id/cancel", subscriptionController.cancelSubscription.bind(subscriptionController));
 
 // Admin only routes
-router.get("/:id", requireRole(['ADMIN']), subscriptionController.getSubscription.bind(subscriptionController));
-router.patch("/:id/status", requireRole(['ADMIN']), subscriptionController.updateSubscriptionStatus.bind(subscriptionController));
+router.get("/:id", requireRole(['ADMIN']), subscriptionController.getUserSubscriptions.bind(subscriptionController));
+router.put("/:id", requireRole(['ADMIN']), subscriptionController.updateSubscription.bind(subscriptionController));
 
 export default router;

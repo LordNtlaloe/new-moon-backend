@@ -1,28 +1,37 @@
+// controllers/subscription-controller.ts
 import { Request, Response, NextFunction } from "express";
 import { ErrorHandler } from "../middleware/error-middleware";
 import { AuthRequest } from "../../middleware/auth-middleware";
-import SubscriptionRepository from "@/repo/interfaces/SubscriptionsRepository";
 import * as subscriptionBusiness from "../../domain/subscriptions-business";
+import SubscriptionRepository from "../../repository/interfaces/SubscriptionsRepository";
 
 export class SubscriptionController {
     constructor(private subscriptionRepository: SubscriptionRepository) { }
 
     async createSubscription(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-            const {
-                tier,
-                billingCycle,
-                amount,
-                currency,
-                currentPeriodStart,
-                currentPeriodEnd,
-                paymentMethod,
-                stripeSubscriptionId
-            } = req.body;
+            const { tier, billingCycle, amount, currency, paymentMethod, stripeSubscriptionId } = req.body;
             const userId = req.user!.userId;
 
-            if (!tier || !billingCycle || !amount || !currentPeriodStart || !currentPeriodEnd) {
-                throw new ErrorHandler(400, "Tier, billing cycle, amount, and period dates are required");
+            if (!tier || !billingCycle || !amount) {
+                throw new ErrorHandler(400, "Tier, billing cycle, and amount are required");
+            }
+
+            const currentPeriodStart = new Date();
+            const currentPeriodEnd = new Date();
+
+            switch (billingCycle) {
+                case 'monthly':
+                    currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+                    break;
+                case 'quarterly':
+                    currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 3);
+                    break;
+                case 'yearly':
+                    currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
+                    break;
+                default:
+                    throw new ErrorHandler(400, "Invalid billing cycle");
             }
 
             const subscriptionData = {
@@ -31,13 +40,13 @@ export class SubscriptionController {
                 billingCycle,
                 amount: parseFloat(amount),
                 currency: currency || 'LSL',
-                currentPeriodStart: new Date(currentPeriodStart),
-                currentPeriodEnd: new Date(currentPeriodEnd),
+                currentPeriodStart,
+                currentPeriodEnd,
                 paymentMethod,
                 stripeSubscriptionId,
             };
 
-            const subscription = await subscriptionBusiness.createNewSubscription(
+            const subscription = await subscriptionBusiness.createSubscription(
                 this.subscriptionRepository,
                 subscriptionData
             );
@@ -68,17 +77,13 @@ export class SubscriptionController {
         }
     }
 
-    async getSubscription(req: AuthRequest, res: Response, next: NextFunction) {
+    async getActiveSubscription(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-            const { id } = req.params;
-            const subscription = await subscriptionBusiness.getSubscription(
+            const userId = req.user!.userId;
+            const subscription = await subscriptionBusiness.getActiveUserSubscription(
                 this.subscriptionRepository,
-                id
+                userId
             );
-
-            if (!subscription) {
-                throw new ErrorHandler(404, "Subscription not found");
-            }
 
             res.json({
                 success: true,
@@ -100,43 +105,22 @@ export class SubscriptionController {
             res.json({
                 success: true,
                 payload: { subscription },
-                message: "Subscription will be cancelled at period end",
+                message: "Subscription cancelled successfully",
             });
         } catch (error: any) {
             next(error);
         }
     }
 
-    async updateSubscriptionStatus(req: AuthRequest, res: Response, next: NextFunction) {
+    async updateSubscription(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { status } = req.body;
+            const updateData = req.body;
 
-            if (!status) {
-                throw new ErrorHandler(400, "Status is required");
-            }
-
-            const subscription = await subscriptionBusiness.updateSubscriptionStatus(
+            const subscription = await subscriptionBusiness.updateSubscription(
                 this.subscriptionRepository,
                 id,
-                status
-            );
-
-            res.json({
-                success: true,
-                payload: { subscription },
-            });
-        } catch (error: any) {
-            next(error);
-        }
-    }
-
-    async getActiveSubscription(req: AuthRequest, res: Response, next: NextFunction) {
-        try {
-            const userId = req.user!.userId;
-            const subscription = await subscriptionBusiness.getActiveUserSubscription(
-                this.subscriptionRepository,
-                userId
+                updateData
             );
 
             res.json({

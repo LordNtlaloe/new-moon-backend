@@ -1,25 +1,7 @@
-import {
-    Exercise,
-    Workout,
-    UserProgress,
-    ExerciseDifficulty,
-    WorkoutType,
-    MembershipTier
-} from "@prisma/client";
+// repository/interfaces/WorkoutRepository.ts
+import { Workout, WorkoutType, MembershipTier } from "@prisma/client";
 
-interface CreateExerciseData {
-    name: string;
-    description?: string;
-    difficulty: ExerciseDifficulty;
-    duration: number;
-    calories: number;
-    image?: string;
-    videoUrl?: string;
-    instructions?: any[];
-    requiredTier?: MembershipTier;
-}
-
-interface CreateWorkoutData {
+export interface CreateWorkoutData {
     title: string;
     description?: string;
     type: WorkoutType;
@@ -28,34 +10,37 @@ interface CreateWorkoutData {
     image?: string;
     requiredTier?: MembershipTier;
     isPremium?: boolean;
-    exerciseIds: string[];
 }
 
-interface UpdateProgressData {
-    completed?: boolean;
-    progress?: number;
+export interface UpdateWorkoutData {
+    title?: string;
+    description?: string;
+    type?: WorkoutType;
     duration?: number;
-    caloriesBurned?: number;
-    completedAt?: Date;
+    totalCalories?: number;
+    image?: string;
+    requiredTier?: MembershipTier;
+    isPremium?: boolean;
+}
+
+export interface WorkoutFilters {
+    type?: WorkoutType;
+    requiredTier?: MembershipTier | { in: MembershipTier[] };
+    isPremium?: boolean;
+    durationMin?: number;
+    durationMax?: number;
+    search?: string;
 }
 
 export default interface WorkoutRepository {
-    // Exercises
-    getExercisesByDifficulty(difficulty: ExerciseDifficulty, tier: MembershipTier): Promise<Exercise[]>;
-    getExerciseById(id: string): Promise<Exercise | null>;
-
-    // Workouts
-    getWorkoutsByTier(tier: MembershipTier): Promise<Workout[]>;
+    createWorkout(data: CreateWorkoutData): Promise<Workout>;
     getWorkoutById(id: string): Promise<Workout | null>;
-    getWorkoutsByType(type: WorkoutType, tier: MembershipTier): Promise<Workout[]>;
-    getTrendingWorkouts(tier: MembershipTier, limit?: number): Promise<Workout[]>;
-    getWorkoutWithExercises(id: string): Promise<(Workout & { workoutExercises: { exercise: Exercise }[] }) | null>;
-
-    // User Progress
-    getUserProgress(userId: string, workoutId: string, exerciseId?: string): Promise<UserProgress | null>;
-    updateUserProgress(userId: string, workoutId: string, data: UpdateProgressData, exerciseId?: string): Promise<UserProgress>;
-    getUserWorkoutProgress(userId: string, workoutId: string): Promise<UserProgress[]>;
-    getTodayWorkouts(userId: string): Promise<Workout[]>;
+    getAllWorkouts(): Promise<Workout[]>;
+    getWorkoutsByFilters(filters: WorkoutFilters): Promise<Workout[]>;
+    updateWorkout(id: string, data: UpdateWorkoutData): Promise<Workout>;
+    deleteWorkout(id: string): Promise<Workout>;
+    getWorkoutsByTier(tier: MembershipTier): Promise<Workout[]>; // UPDATED: Accepts all MembershipTier
+    addExerciseToWorkout(workoutId: string, exerciseId: string, order: number, sets?: number, reps?: number, duration?: number): Promise<any>;
+    removeExerciseFromWorkout(workoutId: string, exerciseId: string): Promise<any>;
+    getWorkoutExercises(workoutId: string): Promise<any[]>;
 }
-
-export type { WorkoutRepository, UpdateProgressData, CreateExerciseData, CreateWorkoutData }

@@ -1,5 +1,6 @@
+// repository/subscription-repository.ts
 import { PrismaClient, Subscription } from "@prisma/client";
-import  SubscriptionRepository , { CreateSubscriptionData, UpdateSubscriptionData} from "./interfaces/SubscriptionsRepository";
+import SubscriptionRepository, { CreateSubscriptionData, UpdateSubscriptionData } from "./interfaces/SubscriptionsRepository";
 
 const prisma = new PrismaClient();
 
@@ -9,13 +10,13 @@ export const createSubscription = async (data: CreateSubscriptionData): Promise<
             data: {
                 userId: data.userId,
                 tier: data.tier,
-                status: data.status || 'ACTIVE',
+                status: 'ACTIVE',
                 billingCycle: data.billingCycle,
                 amount: data.amount,
                 currency: data.currency || 'LSL',
                 currentPeriodStart: data.currentPeriodStart,
                 currentPeriodEnd: data.currentPeriodEnd,
-                cancelAtPeriodEnd: data.cancelAtPeriodEnd ?? false,
+                cancelAtPeriodEnd: false,
                 paymentMethod: data.paymentMethod,
                 stripeSubscriptionId: data.stripeSubscriptionId,
             },
@@ -76,18 +77,6 @@ export const deleteSubscription = async (id: string): Promise<Subscription> => {
     }
 };
 
-export const getSubscriptionByStripeId = async (stripeSubscriptionId: string): Promise<Subscription | null> => {
-    try {
-        return await prisma.subscription.findUnique({
-            where: { stripeSubscriptionId },
-            include: { user: true }
-        });
-    } catch (error: any) {
-        console.error("Error fetching subscription by Stripe ID:", error);
-        throw new Error("Failed to get subscription by Stripe ID");
-    }
-};
-
 export const getActiveSubscriptionByUserId = async (userId: string): Promise<Subscription | null> => {
     try {
         return await prisma.subscription.findFirst({
@@ -105,14 +94,31 @@ export const getActiveSubscriptionByUserId = async (userId: string): Promise<Sub
     }
 };
 
+export const cancelSubscription = async (id: string): Promise<Subscription> => {
+    try {
+        return await prisma.subscription.update({
+            where: { id },
+            data: {
+                status: 'CANCELLED',
+                cancelAtPeriodEnd: true,
+                canceledAt: new Date()
+            },
+            include: { user: true }
+        });
+    } catch (error: any) {
+        console.error("Error cancelling subscription:", error);
+        throw new Error("Failed to cancel subscription");
+    }
+};
+
 const subscriptionRepository: SubscriptionRepository = {
     createSubscription,
     getSubscriptionById,
     getSubscriptionsByUserId,
     updateSubscription,
     deleteSubscription,
-    getSubscriptionByStripeId,
     getActiveSubscriptionByUserId,
+    cancelSubscription,
 };
 
 export default subscriptionRepository;

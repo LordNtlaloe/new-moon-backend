@@ -1,3 +1,4 @@
+import { MembershipTier } from "@prisma/client";
 import { ErrorHandler } from "../api/middleware/error-middleware";
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
@@ -7,6 +8,8 @@ export interface AuthRequest extends Request {
         userId: string;
         email: string;
         role: string;
+        membershipTier?: MembershipTier;
+
     };
 }
 

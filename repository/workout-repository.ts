@@ -1,129 +1,30 @@
-import { PrismaClient, ExerciseDifficulty, WorkoutType, MembershipTier, Exercise, UserProgress, Workout } from "@prisma/client";
-import {
-    WorkoutRepository,
-    CreateExerciseData,
-    CreateWorkoutData,
-    UpdateProgressData
-} from "./interfaces/WorkoutRepository";
+// repository/workout-repository.ts
+import { PrismaClient, Workout, WorkoutType, MembershipTier } from "@prisma/client";
+import WorkoutRepository, { CreateWorkoutData, UpdateWorkoutData, WorkoutFilters } from "./interfaces/WorkoutRepository";
 
 const prisma = new PrismaClient();
 
-// Helper function to get accessible tiers based on user tier
-const getAccessibleTiers = (userTier: MembershipTier): MembershipTier[] => {
-    const tierValues = {
-        FREE: 0,
-        BASIC: 1,
-        PREMIUM: 2,
-        VIP: 3
-    };
-
-    const userTierValue = tierValues[userTier];
-    const allTiers: MembershipTier[] = ['FREE', 'BASIC', 'PREMIUM', 'VIP'];
-
-    return allTiers.filter(tier => tierValues[tier] <= userTierValue);
-};
-
-export const getExercisesByDifficulty = async (
-    difficulty: ExerciseDifficulty,
-    tier: MembershipTier
-): Promise<Exercise[]> => {
+export const createWorkout = async (data: CreateWorkoutData): Promise<Workout> => {
     try {
-        const accessibleTiers = getAccessibleTiers(tier);
-
-        return await prisma.exercise.findMany({
-            where: {
-                difficulty,
-                requiredTier: { in: accessibleTiers }
-            },
-            orderBy: { createdAt: 'desc' }
+        return await prisma.workout.create({
+            data: {
+                title: data.title,
+                description: data.description,
+                type: data.type,
+                duration: data.duration,
+                totalCalories: data.totalCalories,
+                image: data.image,
+                requiredTier: data.requiredTier || MembershipTier.FREE,
+                isPremium: data.isPremium || false,
+            }
         });
     } catch (error: any) {
-        console.error("Error fetching exercises by difficulty:", error);
-        throw new Error("Failed to fetch exercises");
-    }
-};
-
-export const getExerciseById = async (id: string): Promise<Exercise | null> => {
-    try {
-        return await prisma.exercise.findUnique({
-            where: { id }
-        });
-    } catch (error: any) {
-        console.error("Error fetching exercise by ID:", error);
-        throw new Error("Failed to fetch exercise");
-    }
-};
-
-export const getWorkoutsByTier = async (tier: MembershipTier): Promise<Workout[]> => {
-    try {
-        const accessibleTiers = getAccessibleTiers(tier);
-
-        return await prisma.workout.findMany({
-            where: {
-                requiredTier: { in: accessibleTiers }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
-    } catch (error: any) {
-        console.error("Error fetching workouts by tier:", error);
-        throw new Error("Failed to fetch workouts");
-    }
-};
-
-export const getTrendingWorkouts = async (
-    tier: MembershipTier,
-    limit: number = 5
-): Promise<Workout[]> => {
-    try {
-        const accessibleTiers = getAccessibleTiers(tier);
-
-        return await prisma.workout.findMany({
-            where: {
-                requiredTier: { in: accessibleTiers }
-            },
-            orderBy: { createdAt: 'desc' },
-            take: limit
-        });
-    } catch (error: any) {
-        console.error("Error fetching trending workouts:", error);
-        throw new Error("Failed to fetch trending workouts");
-    }
-};
-
-export const getWorkoutsByType = async (
-    type: WorkoutType,
-    tier: MembershipTier
-): Promise<Workout[]> => {
-    try {
-        const accessibleTiers = getAccessibleTiers(tier);
-
-        return await prisma.workout.findMany({
-            where: {
-                type,
-                requiredTier: { in: accessibleTiers }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
-    } catch (error: any) {
-        console.error("Error fetching workouts by type:", error);
-        throw new Error("Failed to fetch workouts by type");
+        console.error("Error creating workout:", error);
+        throw new Error("Failed to create workout");
     }
 };
 
 export const getWorkoutById = async (id: string): Promise<Workout | null> => {
-    try {
-        return await prisma.workout.findUnique({
-            where: { id }
-        });
-    } catch (error: any) {
-        console.error("Error fetching workout by ID:", error);
-        throw new Error("Failed to fetch workout");
-    }
-};
-
-export const getWorkoutWithExercises = async (
-    id: string
-): Promise<(Workout & { workoutExercises: { exercise: Exercise }[] }) | null> => {
     try {
         return await prisma.workout.findUnique({
             where: { id },
@@ -137,136 +38,172 @@ export const getWorkoutWithExercises = async (
             }
         });
     } catch (error: any) {
-        console.error("Error fetching workout with exercises:", error);
-        throw new Error("Failed to fetch workout details");
+        console.error("Error fetching workout:", error);
+        throw new Error("Failed to get workout");
     }
 };
 
-export const getUserProgress = async (
-    userId: string,
-    workoutId: string,
-    exerciseId?: string
-): Promise<UserProgress | null> => {
+export const getAllWorkouts = async (): Promise<Workout[]> => {
     try {
-        return await prisma.userProgress.findUnique({
-            where: {
-                userId_workoutId_exerciseId: {
-                    userId,
-                    workoutId,
-                    exerciseId: exerciseId || '' // Use empty string for workout-only progress
-                }
-            }
+        return await prisma.workout.findMany({
+            orderBy: { title: 'asc' }
         });
     } catch (error: any) {
-        console.error("Error fetching user progress:", error);
-        throw new Error("Failed to fetch user progress");
+        console.error("Error fetching all workouts:", error);
+        throw new Error("Failed to get all workouts");
     }
 };
 
-export const updateUserProgress = async (
-    userId: string,
-    workoutId: string,
-    data: UpdateProgressData,
-    exerciseId?: string
-): Promise<UserProgress> => {
+export const getWorkoutsByFilters = async (filters: WorkoutFilters): Promise<Workout[]> => {
     try {
-        const upsertData: any = {
-            userId,
-            workoutId,
-            exerciseId: exerciseId || '',
-            completed: data.completed,
-            progress: data.progress,
-            duration: data.duration,
-            caloriesBurned: data.caloriesBurned,
-        };
+        const where: any = {};
 
-        // Only set completedAt if completed is true
-        if (data.completed) {
-            upsertData.completedAt = data.completedAt || new Date();
+        if (filters.type) {
+            where.type = filters.type;
         }
 
-        // Set startedAt only for workout-level progress (no exerciseId) when starting
-        if (!exerciseId && data.progress && data.progress > 0) {
-            upsertData.startedAt = new Date();
+        if (filters.requiredTier) {
+            if (typeof filters.requiredTier === 'object' && 'in' in filters.requiredTier) {
+                where.requiredTier = { in: filters.requiredTier.in };
+            } else {
+                where.requiredTier = filters.requiredTier;
+            }
         }
 
-        return await prisma.userProgress.upsert({
-            where: {
-                userId_workoutId_exerciseId: {
-                    userId,
-                    workoutId,
-                    exerciseId: exerciseId || ''
-                }
-            },
-            update: upsertData,
-            create: upsertData
+        if (filters.isPremium !== undefined) {
+            where.isPremium = filters.isPremium;
+        }
+
+        if (filters.durationMin || filters.durationMax) {
+            where.duration = {};
+            if (filters.durationMin) where.duration.gte = filters.durationMin;
+            if (filters.durationMax) where.duration.lte = filters.durationMax;
+        }
+
+        if (filters.search) {
+            where.OR = [
+                { title: { contains: filters.search, mode: 'insensitive' } },
+                { description: { contains: filters.search, mode: 'insensitive' } }
+            ];
+        }
+
+        return await prisma.workout.findMany({
+            where,
+            orderBy: { title: 'asc' }
         });
     } catch (error: any) {
-        console.error("Error updating user progress:", error);
-        throw new Error("Failed to update user progress");
+        console.error("Error fetching workouts by filters:", error);
+        throw new Error("Failed to get workouts by filters");
     }
 };
 
-export const getUserWorkoutProgress = async (
-    userId: string,
-    workoutId: string
-): Promise<UserProgress[]> => {
+export const updateWorkout = async (id: string, data: UpdateWorkoutData): Promise<Workout> => {
     try {
-        return await prisma.userProgress.findMany({
-            where: {
-                userId,
-                workoutId
-            }
+        return await prisma.workout.update({
+            where: { id },
+            data
         });
     } catch (error: any) {
-        console.error("Error fetching user workout progress:", error);
-        throw new Error("Failed to fetch workout progress");
+        console.error("Error updating workout:", error);
+        throw new Error("Failed to update workout");
     }
 };
 
-export const getTodayWorkouts = async (userId: string): Promise<Workout[]> => {
+export const deleteWorkout = async (id: string): Promise<Workout> => {
     try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        return await prisma.workout.delete({
+            where: { id }
+        });
+    } catch (error: any) {
+        console.error("Error deleting workout:", error);
+        throw new Error("Failed to delete workout");
+    }
+};
 
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+// UPDATED: Accepts all MembershipTier values
+export const getWorkoutsByTier = async (tier: MembershipTier): Promise<Workout[]> => {
+    try {
+        return await prisma.workout.findMany({
+            where: { requiredTier: tier },
+            orderBy: { title: 'asc' }
+        });
+    } catch (error: any) {
+        console.error("Error fetching workouts by tier:", error);
+        throw new Error("Failed to get workouts by tier");
+    }
+};
 
-        // Get workouts that user has progress for today
-        const progressRecords = await prisma.userProgress.findMany({
-            where: {
-                userId,
-                createdAt: {
-                    gte: today,
-                    lt: tomorrow
-                },
-                exerciseId: '' // Workout-level progress
+export const addExerciseToWorkout = async (
+    workoutId: string,
+    exerciseId: string,
+    order: number,
+    sets?: number,
+    reps?: number,
+    duration?: number
+): Promise<any> => {
+    try {
+        return await prisma.workoutExercise.create({
+            data: {
+                workoutId,
+                exerciseId,
+                order,
+                sets,
+                reps,
+                duration
             },
             include: {
-                workout: true
+                workout: true,
+                exercise: true
             }
         });
-
-        return progressRecords.map(record => record.workout);
     } catch (error: any) {
-        console.error("Error fetching today's workouts:", error);
-        throw new Error("Failed to fetch today's workouts");
+        console.error("Error adding exercise to workout:", error);
+        throw new Error("Failed to add exercise to workout");
     }
 };
 
-// Repository export - includes all required methods from the interface
+export const removeExerciseFromWorkout = async (workoutId: string, exerciseId: string): Promise<any> => {
+    try {
+        return await prisma.workoutExercise.delete({
+            where: {
+                workoutId_exerciseId: {
+                    workoutId,
+                    exerciseId
+                }
+            }
+        });
+    } catch (error: any) {
+        console.error("Error removing exercise from workout:", error);
+        throw new Error("Failed to remove exercise from workout");
+    }
+};
+
+export const getWorkoutExercises = async (workoutId: string): Promise<any[]> => {
+    try {
+        return await prisma.workoutExercise.findMany({
+            where: { workoutId },
+            include: {
+                exercise: true
+            },
+            orderBy: { order: 'asc' }
+        });
+    } catch (error: any) {
+        console.error("Error fetching workout exercises:", error);
+        throw new Error("Failed to get workout exercises");
+    }
+};
+
 const workoutRepository: WorkoutRepository = {
-    getExercisesByDifficulty,
-    getExerciseById,
-    getWorkoutsByTier,
-    getTrendingWorkouts,
-    getWorkoutsByType,
+    createWorkout,
     getWorkoutById,
-    getWorkoutWithExercises,
-    getUserProgress,
-    updateUserProgress,
-    getUserWorkoutProgress,
-    getTodayWorkouts
+    getAllWorkouts,
+    getWorkoutsByFilters,
+    updateWorkout,
+    deleteWorkout,
+    getWorkoutsByTier,
+    addExerciseToWorkout,
+    removeExerciseFromWorkout,
+    getWorkoutExercises,
 };
 
 export default workoutRepository;
